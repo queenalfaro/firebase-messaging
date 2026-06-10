@@ -109,6 +109,9 @@ class FcmPushClientConfig:  # pylint:disable=too-many-instance-attributes
     reset_interval: float = 3
     """Time in seconds to wait between resets after errors or disconnection."""
 
+    max_wait_in_listen_for_reset: int = 200
+    """Time in seconds to wait in _listen() for a _reset() to succeed."""
+
     heartbeat_ack_timeout: float = 5
     """Time in seconds to wait for a heartbeat ack before resetting."""
 
@@ -682,8 +685,43 @@ class FcmPushClient:  # pylint:disable=too-many-instance-attributes
 
             while self.do_listen:
                 try:
-                    if self.run_state == FcmPushClientRunState.RESETTING:
-                        await asyncio.sleep(1)
+                    if self.run_state in (
+                        FcmPushClientRunState.RESETTING,
+                        FcmPushClientRunState.STARTING_CONNECTION,
+                    ):
+                        counter = 0
+                        while counter < self.config.max_wait_in_listen_for_reset and (
+                            self.run_state == FcmPushClientRunState.RESETTING
+                            or self.run_state
+                            == FcmPushClientRunState.STARTING_CONNECTION
+                        ):
+                            if (counter > 0) and (counter % 10 == 0):
+                                _logger.debug(
+                                    "Listen is waiting for reset to succeed. "
+                                    "Already slept for %ss, and run state "
+                                    "is still %s.",
+                                    counter,
+                                    self.run_state,
+                                )
+                            counter += 1
+                            await asyncio.sleep(1)
+                        if self.run_state in (
+                            FcmPushClientRunState.RESETTING,
+                            FcmPushClientRunState.STARTING_CONNECTION,
+                        ):
+                            _logger.warning(
+                                "Listen gave up waiting for reset to succeed "
+                                "after %ss: run state is still %s.",
+                                counter,
+                                self.run_state,
+                            )
+                        else:
+                            _logger.debug(
+                                "Listen waited %ss for reset to succeed: "
+                                "run state is now %s.",
+                                counter,
+                                self.run_state,
+                            )
                     elif msg := await self._receive_msg():
                         await self._handle_message(msg)
 

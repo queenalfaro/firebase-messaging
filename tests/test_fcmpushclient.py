@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.serialization import load_der_private_key
 from http_ece import encrypt
 
 from firebase_messaging import FcmPushClient, FcmRegisterConfig
+from firebase_messaging.fcmpushclient import FcmPushClientRunState
 from firebase_messaging.proto.mcs_pb2 import (
     Close,
     DataMessageStanza,
@@ -91,6 +92,46 @@ async def test_connection_reset(logged_in_push_client, fake_mcs_endpoint, mocker
 
     msg = await fake_mcs_endpoint.get_message()
     assert isinstance(msg, LoginRequest)
+
+
+async def test_listen_wait_for_reset_timeout(
+    logged_in_push_client, fake_mcs_endpoint, caplog
+):
+    pr = await logged_in_push_client(None, None, max_wait_in_listen_for_reset=2)
+    await asyncio.sleep(0.1)
+
+    pr.run_state = FcmPushClientRunState.RESETTING
+    await fake_mcs_endpoint.put_error(ConnectionResetError())
+
+    await asyncio.sleep(2.5)
+    assert any(
+        "Listen gave up waiting for reset to succeed after 2s" in record.message
+        for record in caplog.records
+        if record.levelname == "WARNING"
+    )
+
+
+async def test_listen_wait_for_reset_success(
+    logged_in_push_client, fake_mcs_endpoint, caplog
+):
+    pr = await logged_in_push_client(None, None)
+    await asyncio.sleep(0.1)
+
+    pr.run_state = FcmPushClientRunState.RESETTING
+    await fake_mcs_endpoint.put_error(ConnectionResetError())
+
+    await asyncio.sleep(0.2)
+    pr.run_state = FcmPushClientRunState.STARTED
+
+    await asyncio.sleep(1.3)
+    assert any(
+        "Listen waited 1s for reset to succeed" in record.message
+        for record in caplog.records
+        if record.levelname == "DEBUG"
+    )
+    assert (
+        len([record for record in caplog.records if record.levelname == "WARNING"]) == 0
+    )
 
 
 @pytest.mark.parametrize("error_count", [1, 2, 3, 6])
