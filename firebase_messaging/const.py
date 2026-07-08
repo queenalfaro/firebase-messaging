@@ -22,6 +22,7 @@ FCM_REGISTRATION = "https://fcmregistrations.googleapis.com/v1/"
 FCM_INSTALLATION = "https://firebaseinstallations.googleapis.com/v1/"
 AUTH_VERSION = "FIS_v2"
 SDK_VERSION = "w:0.6.6"
+ANDROID_SDK_VERSION = "a:17.0.0"
 
 DOORBELLS_ENDPOINT = "/clients_api/doorbots/{0}"
 
@@ -30,3 +31,9 @@ MCS_HOST = "mtalk.google.com"
 MCS_PORT = 5228
 MCS_SELECTIVE_ACK_ID = 12
 MCS_STREAM_ACK_ID = 13
+
+ANDROID_USER_AGENT = "Android-GCM/1.5"
+ANDROID_OS_VERSION = "28"
+ANDROID_GMS_VERSION = "220920023"
+ANDROID_CLI_VERSION = "fcm-25.0.1"
+ANDROID_TSDK_VERSION = "36"

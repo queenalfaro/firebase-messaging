@@ -22,7 +22,7 @@ Firebase Messaging
     :alt: Py Versions
     :target: https://pypi.python.org/pypi/firebase-messaging#
 
-A library to subscribe to GCM/FCM and receive notifications within a python application.
+A library to subscribe to GCM/FCM and receive notifications (Web and Android) within a python application.
 
 When should I use `firebase-messaging` ?
 ----------------------------------------
@@ -74,6 +74,77 @@ python::
     # Adapt the following for your usage
     while some_condition_to_keep_listening:
         asyncio.sleep(2)
+
+
+Android Client Support
+----------------------
+
+This fork introduces native support for registering and connecting as an **Android client** rather than a Web Push client. This is useful for mimicking Android devices to receive unencrypted, raw FCM payloads directly.
+
+Key Additions
+~~~~~~~~~~~~~
+
+* **``AndroidRegisterConfig``**: Extends ``FcmRegisterConfig`` to hold Android-specific metadata (e.g., Package/Bundle ID, SHA1 Certificate Fingerprint, Android GMS/OS versions).
+* **``AndroidFcmRegister``**: Performs full GCM check-in, Firebase installation, and GCM device registration using Android credentials.
+* **``AndroidPushClient``**: Connects to the MCS service as an Android client. Unlike Web Push, it directly decodes and forwards raw, unencrypted payloads.
+
+Usage Example
+~~~~~~~~~~~~~
+
+Ensure you import the classes from the Android-specific modules::
+
+    import asyncio
+    import logging
+    from firebase_messaging.android_fcmpushclient import AndroidPushClient
+    from firebase_messaging.android_fcmregister import AndroidRegisterConfig
+
+    # Callback function triggered when a push notification is received
+    def on_notification(data, persistent_id, context):
+        print(f"Received notification: {data}")
+
+    def credentials_updated_callback(new_creds):
+        # Save these credentials locally to avoid re-registering on every launch
+        print("Credentials updated:", new_creds)
+
+    async def main():
+        # Full configuration block with non-constant parameters replaced by placeholders
+        fcm_config = AndroidRegisterConfig(
+            project_id="your-firebase-project-id",
+            app_id="1:123456789012:android:abcdef1234567890",
+            api_key="AIzaSyDummY_Key_For_Example_Only_abc123",
+            messaging_sender_id="123456789012",
+            bundle_id="com.example.androidapp",
+            cert_sha1="A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2",
+            app_name_hash="AbCdEfGhIjKlMnOpQrStUvWxYz1",
+            app_ver="1000",
+            app_ver_name="1.0.0",
+            # Default environment parameters (can be omitted to use default constants)
+            osv="28",
+            cliv="fcm-25.0.1",
+            gmsv="220920023",
+            target_ver="36"
+        )
+
+        client = AndroidPushClient(
+            callback=on_notification,
+            fcm_config=fcm_config,
+            credentials=None,  # Pass previously stored credentials dict here if available
+            credentials_updated_callback=credentials_updated_callback,
+        )
+
+        # Register the device and retrieve the FCM token
+        fcm_token = await client.checkin_or_register()
+        print(f"FCM Android Token: {fcm_token}")
+
+        # Connect to MCS and start listening for push notifications
+        await client.start()
+
+        while True:
+            await asyncio.sleep(1)
+
+    if __name__ == "__main__":
+        logging.basicConfig(level=logging.INFO)
+        asyncio.run(main())
 
 
 Attribution
